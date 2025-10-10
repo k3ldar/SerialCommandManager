@@ -1,8 +1,15 @@
+
 #include "SerialCommandManager.h"
 
-SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCallback commandReceived,
-	char terminator, char commandSeperator, char paramSeperator,
-	unsigned long timeoutMilliseconds, unsigned int maxMessageSize)
+
+
+//example to get memory
+// MEM;
+// DEBUG; -- returns the debug mode status
+// DEBUG:ON; -- turns debug mode on
+// DEBUG:OFF; -- turns debug mode off
+
+SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCallback commandReceived, char terminator, char commandSeperator, char paramSeperator, unsigned long timeoutMilliseconds, byte maximumMessageSize)
 {
 	_serialPort = serialPort;
 	_messageReceivedCallback = commandReceived;
@@ -10,284 +17,238 @@ SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCa
 	_commandSeperator = commandSeperator;
 	_paramSeperator = paramSeperator;
 	_serialTimeout = timeoutMilliseconds;
-	_maximumMessageSize = maxMessageSize;
+	_maximumMessageSize = maximumMessageSize;
 	_isDebug = false;
-	_messageComplete = false;
-	_messageTimeout = false;
-	_paramCount = 0;
-	_params = nullptr;
-	_handlers = nullptr;
-	_handlerCount = 0;
-}
 
-SerialCommandManager::~SerialCommandManager()
+    // Reserve for frequently appended buffers
+    // Reserve a bit more than maximum to avoid edge reallocs
+    size_t msgReserve = (size_t)_maximumMessageSize + 8;
+    if (msgReserve > 0) {
+        _incomingMessage.reserve(msgReserve);
+        _rawMessage.reserve(msgReserve);
+        _command.reserve(64); // typical command length
+    }
+
+    // Reserve for parameter key/value strings
+    size_t perParam = _maximumMessageSize > 0 ? (_maximumMessageSize / MaximumParameterCount) + 4 : 32;
+    for (int i = 0; i < MaximumParameterCount; ++i) {
+        _params[i].key.reserve(perParam);
+        _params[i].value.reserve(perParam);
+    }}
+
+bool SerialCommandManager::isTimeout()
 {
-	clearParams();
-	if (_handlers)
-	{
-		free(_handlers);
-		_handlers = nullptr;
-	}
+	return _messageTimeout;
 }
 
-bool SerialCommandManager::isCompleteMessage() { return _messageComplete; }
-bool SerialCommandManager::isTimeout() { return _messageTimeout; }
-String SerialCommandManager::getCommand() { return _command; }
-int SerialCommandManager::getArgCount() { return _paramCount; }
-String SerialCommandManager::getRawMessage() { return _rawMessage; }
+String SerialCommandManager::getCommand()
+{
+	return _command;
+}
 
 StringKeyValue SerialCommandManager::getArgs(int index)
 {
 	if (index < 0 || index >= _paramCount)
-		return {"", ""};
+		return { "", "" };
+	
 	return _params[index];
 }
 
-/**
- * @brief Frees all allocated parameter memory and resets count.
- */
-void SerialCommandManager::clearParams()
+int SerialCommandManager::getArgCount()
 {
-	if (_params)
-	{
-		free(_params);
-		_params = nullptr;
-	}
-	_paramCount = 0;
+	return _paramCount;
 }
 
-/**
- * @brief Reads characters from the serial port, builds and parses messages.
- */
+String SerialCommandManager::getRawMessage()
+{
+	return _rawMessage;
+}
 void SerialCommandManager::readCommands()
 {
-	if (_serialPort->available() > 0)
-	{
-		String incomingMessage;
-		incomingMessage.reserve(_maximumMessageSize);
-		_messageTimeout = false;
-		_messageComplete = false;
-		_rawMessage = "";
-		unsigned long startMillis = millis();
-		bool isCommand = true;
-		bool isParamName = true;
-		clearParams();
+    // 1. Check if any characters have arrived
+    while (_serialPort->available() > 0)
+    {
+        char inChar = (char)_serialPort->read();
+        _lastCharTime = millis();
 
-		while (!_messageComplete)
-		{
-			if (_serialPort->available() > 0)
+        if (!_readingMessage)
+        {
+            _readingMessage = true;
+            _messageTimeout = false;
+			_isParsingCommand = true;
+            _rawMessage = "";
+            _incomingMessage = "";
+            _paramCount = 0;
+        }
+
+        _rawMessage += inChar;
+
+        if (inChar == _terminator)
+        {
+            _readingMessage = false;
+
+            // Strip terminator and any trailing newline/CR
+            _incomingMessage.trim();
+            if (_incomingMessage.endsWith(String(_terminator)))
 			{
-				char inChar = (char)_serialPort->read();
-				_rawMessage += inChar;
+                _incomingMessage.remove(_incomingMessage.length() - 1);
+            }
+			
+			int sepChar = _incomingMessage.indexOf(_commandSeperator);
+			
+			if (sepChar > -1)
+				_command = _incomingMessage.substring(0, sepChar);
+			else
+				_command = _incomingMessage;
+			
+			_command.trim();
 
-				if (inChar == _terminator)
-				{
-					_messageComplete = true;
-					break;
-				}
-				else if (inChar == _commandSeperator)
-				{
-					isCommand = false;
-					isParamName = true;
-					_paramCount++;
-					_params = (StringKeyValue*)realloc(_params, sizeof(StringKeyValue) * _paramCount);
-					_params[_paramCount - 1].key = "";
-					_params[_paramCount - 1].value = "";
-				}
-				else if (inChar == _paramSeperator)
-				{
-					isParamName = false;
-				}
-				else
-				{
-					if (isCommand)
-						incomingMessage += inChar;
-					else
-					{
-						if (_paramCount == 0)
-						{
-							_paramCount++;
-							_params = (StringKeyValue*)realloc(_params, sizeof(StringKeyValue) * _paramCount);
-							_params[0].key = "";
-							_params[0].value = "";
-						}
-						if (isParamName)
-							_params[_paramCount - 1].key += inChar;
-						else
-							_params[_paramCount - 1].value += inChar;
-					}
-				}
-
-				if (incomingMessage.length() > _maximumMessageSize)
-				{
-					_serialPort->println(F("ERR:Too Long"));
-					return;
-				}
-			}
-
-			if (millis() - startMillis > _serialTimeout)
-			{
-				_serialPort->println(F("ERR:Timeout"));
-				_messageTimeout = true;
-				return;
-			}
-		}
-
-		int sepChar = incomingMessage.indexOf(_commandSeperator);
-		if (sepChar > -1)
-			_command = incomingMessage.substring(0, sepChar);
-		else
-			_command = incomingMessage;
-
-		if (!processMessage() && _messageReceivedCallback)
-		{
-			if (!callHandler(_command))
+			if (!processMessage() && _messageReceivedCallback)
 				_messageReceivedCallback(this);
-		}
-	}
-	YIELD;
+
+           break;
+        }
+        else if (inChar == _commandSeperator)
+        {
+            if (_paramCount < MaximumParameterCount)
+            {
+                _paramCount++;
+                _params[_paramCount - 1].key = "";
+                _params[_paramCount - 1].value = "";
+            }
+            _isParsingCommand = false;
+            _isParsingParamName = true;
+        }
+        else if (inChar == _paramSeperator)
+        {
+            _isParsingParamName = false;
+        }
+        else
+        {
+            if (_isParsingCommand)
+            {
+                _incomingMessage += inChar;
+            }
+            else if (_paramCount > 0)
+            {
+                if (_isParsingParamName)
+                    _params[_paramCount - 1].key += inChar;
+                else
+                    _params[_paramCount - 1].value += inChar;
+            }
+        }
+
+        if (_incomingMessage.length() > _maximumMessageSize)
+        {
+            sendError("Too Long", "SerialCommandManager");
+            _readingMessage = false;
+            return;
+        }
+    }
+
+    // 2. Check timeout (only if we were in middle of a message)
+    if (_readingMessage && (millis() - _lastCharTime > _serialTimeout))
+    {
+        sendError("Timeout", "SerialCommandManager");
+        _messageTimeout = true;
+        _readingMessage = false;
+        return;
+    }
 }
 
-/**
- * @brief Handles built-in DEBUG command.
- * @return True if handled internally.
- */
-bool SerialCommandManager::processMessage()
+void SerialCommandManager::sendCommand(String header, String message, String identifier, StringKeyValue params[], int argLength)
 {
-	sendDebug(_rawMessage, "SerialComdMgr");
-
-	if (_command.equalsIgnoreCase("DEBUG"))
-	{
-		if (_paramCount == 1)
-			_isDebug = _params[0].key.equalsIgnoreCase("ON");
-
-		sendCommand("DEBUG", _isDebug ? "ON" : "OFF");
-		return true;
-	}
-	return false;
-}
-
-/**
- * @brief Invokes a registered handler if the command matches.
- */
-bool SerialCommandManager::callHandler(const String& command)
-{
-	for (int i = 0; i < _handlerCount; i++)
-	{
-		if (_handlers[i].command.equalsIgnoreCase(command))
-		{
-			if (_handlers[i].handler)
-				_handlers[i].handler(command, _params, _paramCount, _handlers[i].context);
-			return true;
-		}
-	}
-	return false;
-}
-
-/**
- * @brief Registers a handler dynamically.
- */
-bool SerialCommandManager::registerHandler(const String& command, CommandHandlerFunc handler, void* context)
-{
-	if (!handler || command.length() == 0)
-		return false;
-
-	_handlers = (CommandHandlerEntry*)realloc(_handlers, sizeof(CommandHandlerEntry) * (_handlerCount + 1));
-	if (!_handlers)
-		return false;
-
-	_handlers[_handlerCount].command = command;
-	_handlers[_handlerCount].handler = handler;
-	_handlers[_handlerCount].context = context;
-	_handlerCount++;
-	return true;
-}
-
-/**
- * @brief Removes a handler from the registry.
- */
-bool SerialCommandManager::unregisterHandler(const String& command)
-{
-	for (int i = 0; i < _handlerCount; i++)
-	{
-		if (_handlers[i].command.equalsIgnoreCase(command))
-		{
-			for (int j = i; j < _handlerCount - 1; j++)
-				_handlers[j] = _handlers[j + 1];
-
-			_handlerCount--;
-			_handlers = (CommandHandlerEntry*)realloc(_handlers, sizeof(CommandHandlerEntry) * _handlerCount);
-			return true;
-		}
-	}
-	return false;
-}
-
-/**
- * @brief Sends a command with optional parameters.
- */
-void SerialCommandManager::sendCommand(const String& header, const String& message, const String& identifier,
-                                       StringKeyValue params[], int argLength)
-{
-	if (!header.length())
+	if (header.length() == 0)
 		return;
 
+    // Normalize argLength and guard params pointer
+    if (argLength < 0)
+		argLength = 0;
+	
+    if (argLength > MaximumParameterCount)
+		argLength = MaximumParameterCount;
+	
+    if (argLength > 0 && params == nullptr)
+		argLength = 0;
+	
 	_serialPort->print(header);
 	_serialPort->print(_commandSeperator);
-
-	if (message.length())
+	
+	if (message.length() > 0)
 	{
 		_serialPort->print(message);
+		
 		if (argLength > 0)
 			_serialPort->print(_commandSeperator);
 	}
-
+	
+	
 	for (int i = 0; i < argLength; i++)
 	{
 		_serialPort->print(params[i].key);
 		_serialPort->print(_paramSeperator);
 		_serialPort->print(params[i].value);
-		if (i < argLength - 1)
+		
+		if ((argLength -1) != i)
 			_serialPort->print(_commandSeperator);
 	}
-
-	if (identifier.length())
+	
+	if (identifier != "")
 		_serialPort->print(": (" + identifier + ")");
 
-	_serialPort->println(_terminator);
+	_serialPort->print(_terminator);
 }
 
-/**
- * @brief Sends a debug message if debug mode is enabled.
- */
-void SerialCommandManager::sendDebug(const String& message, const String& identifier)
+bool SerialCommandManager::processMessage()
+{
+    sendDebug(_rawMessage, "SerialComdMgr-RawMessage:");
+
+    if (_rawMessage.length() == 0)
+        return true;
+
+    if (_command == "DEBUG")
+    {
+        if (_paramCount == 1)
+        {
+            String token = _params[0].value;
+            if (token.length() == 0) token = _params[0].key;
+            token.trim();
+            token.toUpperCase();
+            _isDebug = (token == "ON");
+        }
+
+        sendCommand("DEBUG", _isDebug ? "ON" : "OFF");
+        return true;
+    }
+
+    return false;
+}
+
+void SerialCommandManager::sendDebug(String message, String identifier)
 {
 	sendMessage("DEBUG", message, identifier);
 }
 
-/**
- * @brief Sends a message of a specific type.
- */
-void SerialCommandManager::sendMessage(const String& messageType, const String& message, const String& identifier)
+void SerialCommandManager::sendMessage(String messageType, String message, String identifier)
 {
-	if (!message.length() || !_isDebug)
+	if (message.length() == 0)
+		return;
+
+	if (messageType == "DEBUG" && !_isDebug)
 		return;
 
 	_serialPort->print(messageType);
-	_serialPort->print(":");
+	_serialPort->print(F(":"));
 	_serialPort->print(message);
-
-	if (identifier.length())
+	
+	if (identifier.length() > 0)
 		_serialPort->print(": (" + identifier + ")");
-
+	
 	if (!message.endsWith(String(_terminator)))
-		_serialPort->println(_terminator);
+		_serialPort->print(_terminator);
 }
 
-/**
- * @brief Sends an error message.
- */
-void SerialCommandManager::sendError(const String& message, const String& identifier)
+void SerialCommandManager::sendError(String message, String identifier)
 {
 	sendMessage("ERR", message, identifier);
 }
