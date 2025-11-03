@@ -240,7 +240,12 @@ void SerialCommandManager::sendCommand(String header, String message, String ide
         msg.remove(msg.length() - 1);
 
     _serialPort->print(header);
-    _serialPort->print(_commandSeperator);
+    
+    // Only print separator if we have message content or parameters
+    if (msg.length() > 0 || argLength > 0)
+    {
+        _serialPort->print(_commandSeperator);
+    }
 
     if (msg.length() > 0)
     {
