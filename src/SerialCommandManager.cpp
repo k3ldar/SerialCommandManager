@@ -14,7 +14,7 @@
 // internal message handlers
 class DebugHandler : public ISerialCommandHandler {
 public:
-    void handleCommand(SerialCommandManager* sender, const String command, const StringKeyValue params[], int paramCount) override
+    bool handleCommand(SerialCommandManager* sender, const String command, const StringKeyValue params[], int paramCount) override
     {
         String token;
         if (paramCount >= 1) {
@@ -26,6 +26,7 @@ public:
         else if (token == "OFF") sender->_isDebug = false;
 
         sender->sendCommand(command, sender->_isDebug ? "ON" : "OFF");
+        return true;
     }
 
     const String* supportedCommands(size_t& count) const override {
@@ -288,8 +289,8 @@ bool SerialCommandManager::processMessage()
     {
         if (_handlerObjects[i]->supportsCommand(_command))
         {
-            _handlerObjects[i]->handleCommand(this, _command, _params, _paramCount);
-            return true;
+            if (_handlerObjects[i]->handleCommand(this, _command, _params, _paramCount))
+                return true;
         }
     }
 

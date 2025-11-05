@@ -51,8 +51,9 @@ public:
      * @param command The command string that was received.
      * @param params Array of key-value parameter pairs.
      * @param paramCount Number of parameters in the array.
+	 * @return true if the command was handled successfully, false otherwise.
      */
-    virtual void handleCommand(SerialCommandManager* sender, const String command, const StringKeyValue params[], int paramCount) = 0;
+    virtual bool handleCommand(SerialCommandManager* sender, const String command, const StringKeyValue params[], int paramCount) = 0;
 
     /**
      * @brief Returns a list of supported command tokens.
