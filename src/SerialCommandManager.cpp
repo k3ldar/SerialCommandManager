@@ -14,7 +14,7 @@
 // internal message handlers
 class DebugHandler : public ISerialCommandHandler {
 public:
-    bool handleCommand(SerialCommandManager* sender, const String command, const StringKeyValue params[], int paramCount) override
+    bool handleCommand(SerialCommandManager* sender, const String command, const StringKeyValue params[], uint8_t paramCount) override
     {
         String token;
         if (paramCount >= 1) {
@@ -64,7 +64,7 @@ SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCa
 
     // Reserve for parameter key/value strings
     size_t perParam = _maximumMessageSize > 0 ? (_maximumMessageSize / MaximumParameterCount) + 4 : 32;
-    for (int i = 0; i < MaximumParameterCount; ++i) 
+    for (uint8_t i = 0; i < MaximumParameterCount; ++i)
     {
         _params[i].key.reserve(perParam);
         _params[i].value.reserve(perParam);
@@ -111,7 +111,7 @@ String SerialCommandManager::getCommand()
 	return _command;
 }
 
-StringKeyValue SerialCommandManager::getArgs(int index)
+StringKeyValue SerialCommandManager::getArgs(uint8_t index)
 {
 	if (index < 0 || index >= _paramCount)
 		return { "", "" };
@@ -119,7 +119,7 @@ StringKeyValue SerialCommandManager::getArgs(int index)
 	return _params[index];
 }
 
-int SerialCommandManager::getArgCount()
+uint8_t SerialCommandManager::getArgCount()
 {
 	return _paramCount;
 }
@@ -159,7 +159,7 @@ void SerialCommandManager::readCommands()
                 _incomingMessage.remove(_incomingMessage.length() - 1);
             }
 			
-			int sepChar = _incomingMessage.indexOf(_commandSeperator);
+            uint16_t sepChar = _incomingMessage.indexOf(_commandSeperator);
 			
 			if (sepChar > -1)
 				_command = _incomingMessage.substring(0, sepChar);
@@ -220,15 +220,12 @@ void SerialCommandManager::readCommands()
     }
 }
 
-void SerialCommandManager::sendCommand(String header, String message, String identifier, StringKeyValue* params, int argLength)
+void SerialCommandManager::sendCommand(String header, String message, String identifier, StringKeyValue* params, uint8_t argLength)
 {
     if (header.length() == 0)
         return;
 
     // Normalize argLength and guard params pointer
-    if (argLength < 0)
-		argLength = 0;
-	
     if (argLength > MaximumParameterCount)
 		argLength = MaximumParameterCount;
 	
@@ -256,7 +253,7 @@ void SerialCommandManager::sendCommand(String header, String message, String ide
             _serialPort->print(_commandSeperator);
     }
 
-    for (int i = 0; i < argLength; ++i)
+    for (uint8_t i = 0; i < argLength; ++i)
     {
         if (!params)
 			break;

@@ -12,7 +12,7 @@
  #define YIELD
 #endif
 
-const int MaximumParameterCount = 5;
+const uint8_t MaximumParameterCount = 5;
 
 typedef struct StringKeyValue {
    String key;
@@ -53,7 +53,7 @@ public:
      * @param paramCount Number of parameters in the array.
 	 * @return true if the command was handled successfully, false otherwise.
      */
-    virtual bool handleCommand(SerialCommandManager* sender, const String command, const StringKeyValue params[], int paramCount) = 0;
+    virtual bool handleCommand(SerialCommandManager* sender, const String command, const StringKeyValue params[], uint8_t paramCount) = 0;
 
     /**
      * @brief Returns a list of supported command tokens.
@@ -122,10 +122,10 @@ private:
     Stream* _serialPort;
     String _command;
     StringKeyValue _params[MaximumParameterCount];
-    int _paramCount;
+    uint8_t _paramCount;
     String _rawMessage;
     unsigned long _serialTimeout;
-    byte _maximumMessageSize;
+    uint8_t _maximumMessageSize;
     bool _messageTimeout;
     char _terminator;
     char _commandSeperator;
@@ -202,14 +202,14 @@ public:
      * @param index Index of the argument to retrieve.
      * @return The key/value pair at the specified index.
      */
-    StringKeyValue getArgs(int index);
+    StringKeyValue getArgs(uint8_t index);
 
     /**
      * @brief Gets the number of parsed arguments in the last message.
      * 
      * @return The argument count.
      */
-    int getArgCount();
+    uint8_t getArgCount();
 
     /**
      * @brief Gets the raw message string as received.
@@ -227,7 +227,7 @@ public:
      * @param params Optional array of key/value parameters.
      * @param argLength Number of parameters in the array.
      */
-    void sendCommand(String header, String message, String identifier = "", StringKeyValue* params = nullptr, int argLength = 0);
+    void sendCommand(String header, String message, String identifier = "", StringKeyValue* params = nullptr, uint8_t argLength = 0);
 
     /**
      * @brief Sends a debug message over the serial port.

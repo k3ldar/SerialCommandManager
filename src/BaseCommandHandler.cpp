@@ -1,6 +1,6 @@
 #include "BaseCommandHandler.h"
 
-void BaseCommandHandler::sendAckOk(SerialCommandManager* sender, const String& cmd, const StringKeyValue* param)
+void BaseCommandHandler::sendAckOk(SerialCommandManager* sender, const String& cmd, const StringKeyValue* param, uint8_t paramCount)
 {
     if (!sender)
         return;
@@ -14,10 +14,10 @@ void BaseCommandHandler::sendAckOk(SerialCommandManager* sender, const String& c
     if (param == nullptr)
         sender->sendCommand("ACK", payload);
     else
-        sender->sendCommand("ACK", payload, "", const_cast<StringKeyValue*>(param), 1);
+        sender->sendCommand("ACK", payload, "", const_cast<StringKeyValue*>(param), paramCount);
 }
 
-void BaseCommandHandler::sendAckErr(SerialCommandManager* sender, const String& cmd, const String& err, const StringKeyValue* param)
+void BaseCommandHandler::sendAckErr(SerialCommandManager* sender, const String& cmd, const String& err, const StringKeyValue* param, uint8_t paramCount)
 {
     if (!sender)
         return;
@@ -29,5 +29,5 @@ void BaseCommandHandler::sendAckErr(SerialCommandManager* sender, const String& 
     if (param == nullptr)
         sender->sendCommand("ACK", payload);
     else
-        sender->sendCommand("ACK", payload, "", const_cast<StringKeyValue*>(param), 1);
+        sender->sendCommand("ACK", payload, "", const_cast<StringKeyValue*>(param), paramCount);
 }

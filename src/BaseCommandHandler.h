@@ -21,8 +21,9 @@ protected:
      * @param sender Pointer to the `SerialCommandManager` that will perform the send.
      * @param cmd The command header/string to include in the ACK.
      * @param param Optional key/value parameter to include with the ACK (may be `nullptr`).
+     * @param paramCount Number of parameters if `param` is an array, default 1.
      */
-    void sendAckOk(SerialCommandManager* sender, const String& cmd, const StringKeyValue* param = nullptr);
+    void sendAckOk(SerialCommandManager* sender, const String& cmd, const StringKeyValue* param = nullptr, uint8_t paramCount = 1);
 
     /**
      * @brief Send an acknowledgement indicating the command failed.
@@ -31,6 +32,7 @@ protected:
      * @param cmd The command header/string to include in the ACK.
      * @param err A human-readable error string describing the failure.
      * @param param Optional key/value parameter to include with the error ACK (may be `nullptr`).
+	 * @param paramCount Number of parameters if `param` is an array, default 1.
      */
-    void sendAckErr(SerialCommandManager* sender, const String& cmd, const String& err, const StringKeyValue* param = nullptr);
+    void sendAckErr(SerialCommandManager* sender, const String& cmd, const String& err, const StringKeyValue* param = nullptr, uint8_t paramCount = 1);
 };
