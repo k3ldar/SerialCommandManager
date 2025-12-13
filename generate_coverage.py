@@ -8,7 +8,6 @@ def generate_coverage_report(*args, **kwargs):
     
     # Run lcov to capture coverage data
     build_dir = os.path.join(env.subst("$PROJECT_DIR"), ".pio", "build", "native")
-    src_dir = os.path.join(env.subst("$PROJECT_DIR"), "src")
     coverage_dir = os.path.join(env.subst("$PROJECT_DIR"), "coverage")
     
     # Create coverage directory
