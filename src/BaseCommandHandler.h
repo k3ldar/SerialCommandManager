@@ -90,6 +90,6 @@ protected:
      * @param value The value as a uint8_t value (will be converted to string).
      * @return StringKeyValue with key copied and value converted to string.
      */
-    static StringKeyValue makeParam(const char* key, char* value);
+    static StringKeyValue makeParam(const char* key, const char* value);
 
 };
