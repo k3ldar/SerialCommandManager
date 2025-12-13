@@ -115,7 +115,7 @@ StringKeyValue BaseCommandHandler::makeParam(const char* key, int value)
     return param;
 }
 
-StringKeyValue BaseCommandHandler::makeParam(const char* key, char* value)
+StringKeyValue BaseCommandHandler::makeParam(const char* key, const char* value)
 {
     StringKeyValue param = {};
 
