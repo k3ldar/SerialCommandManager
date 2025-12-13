@@ -21,5 +21,4 @@ jobs:
     
     - name: Run Tests
       run: |
-        cd SerialCommandManager
         pio test -e native
