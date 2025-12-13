@@ -9,8 +9,8 @@
      */
     static void safeCopy(char* dest, const char* src, size_t maxLen) {
         if (!dest || !src || maxLen == 0) return;
-        strncpy(dest, src, maxLen);
-        dest[maxLen] = '\0'; // Ensure null termination
+        strncpy(dest, src, maxLen - 1);
+        dest[maxLen - 1] = '\0'; // Ensure null termination
     }
 
     /**
