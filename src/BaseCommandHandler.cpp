@@ -125,7 +125,7 @@ StringKeyValue BaseCommandHandler::makeParam(const char* key, char* value)
         param.key[DefaultMaxParamKeyLength] = '\0';
     }
 
-	if (value != nullptr)
+    if (value != nullptr)
     {
         strncpy(param.value, value, DefaultMaxParamValueLength);
         param.value[DefaultMaxParamValueLength] = '\0';
