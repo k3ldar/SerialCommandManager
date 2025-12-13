@@ -13,10 +13,19 @@
 #endif
 
 const uint8_t MaximumParameterCount = 5;
+const uint8_t DefaultMaxCommandLength = 20;
+const uint8_t DefaultMaxParamKeyLength = 10;
+const uint8_t DefaultMaxParamValueLength = 64;
+const uint8_t DefaultMaxMessageLength = 128;
 
+/**
+ * @brief Structure representing a key/value parameter pair.
+ * 
+ * This structure is used to hold individual parameters parsed from a command message.
+ */
 typedef struct StringKeyValue {
-   String key;
-   String value;
+    char key[DefaultMaxParamKeyLength + 1];
+    char value[DefaultMaxParamValueLength + 1];
 } keyAndValue;
 
 /**
@@ -29,7 +38,7 @@ typedef void (*MessageReceivedCallback)(class SerialCommandManager* sender);
 /**
  * @brief Interface for handling serial commands.
  * 
- * This is an interface class that defines how command handlers should behave. It’s meant to be implemented by any class that wants to handle specific serial commands.
+ * This is an interface class that defines how command handlers should behave. It's meant to be implemented by any class that wants to handle specific serial commands.
  *
  * Responsibilities:
  * Command Handling: Implements handleCommand() to define how to respond when a command is received.
@@ -39,7 +48,7 @@ typedef void (*MessageReceivedCallback)(class SerialCommandManager* sender);
  * Command Matching: Includes a helper method supportsCommand() to check if a given command is supported.
  *
  * Use Case:
- * You’d create one or more classes that inherit from ISerialCommandHandler to handle different command types. For example, 
+ * You'd create one or more classes that inherit from ISerialCommandHandler to handle different command types. For example, 
  * a MotorHandler might respond to "MOVE" or "STOP" commands.
 */
 class ISerialCommandHandler {
@@ -51,17 +60,17 @@ public:
      * @param command The command string that was received.
      * @param params Array of key-value parameter pairs.
      * @param paramCount Number of parameters in the array.
-	 * @return true if the command was handled successfully, false otherwise.
+     * @return true if the command was handled successfully, false otherwise.
      */
-    virtual bool handleCommand(SerialCommandManager* sender, const String command, const StringKeyValue params[], uint8_t paramCount) = 0;
+    virtual bool handleCommand(SerialCommandManager* sender, const char* command, const StringKeyValue params[], uint8_t paramCount) = 0;
 
     /**
      * @brief Returns a list of supported command tokens.
      * 
      * @param count Reference to store the number of supported commands.
-     * @return const String* Array of supported commands (uppercase, trimmed).
+     * @return const char* const* Array of supported commands (uppercase, trimmed).
      */
-    virtual const String* supportedCommands(size_t& count) const = 0;
+    virtual const char* const* supportedCommands(size_t& count) const = 0;
 
     /**
      * @brief Checks if this handler supports a specific command.
@@ -69,11 +78,13 @@ public:
      * @param command The command string to check.
      * @return true if the command is supported, false otherwise.
      */
-    virtual bool supportsCommand(const String& command) const {
+    virtual bool supportsCommand(const char* command) const {
+        if (!command) return false;
+        
         size_t count;
-        const String* cmds = supportedCommands(count);
+        const char* const* cmds = supportedCommands(count);
         for (size_t i = 0; i < count; ++i) {
-            if (cmds[i] == command) return true;
+            if (strcmp(cmds[i], command) == 0) return true;
         }
         return false;
     }
@@ -118,14 +129,18 @@ private:
     bool _isParsingCommand = true;
     bool _isParsingParamName = true;
     unsigned long _lastCharTime = 0;
-    String _incomingMessage;
+    
+    // Buffer management
+    char* _incomingMessage;        // Dynamic buffer for incoming message
+    char* _command;                // Dynamic buffer for parsed command
+    char* _rawMessage;             // Dynamic buffer for raw message
+    uint8_t _maxCommandLength;     // Max command buffer size
+    uint8_t _maxMessageLength;     // Max message buffer size
+    
     Stream* _serialPort;
-    String _command;
     StringKeyValue _params[MaximumParameterCount];
     uint8_t _paramCount;
-    String _rawMessage;
     unsigned long _serialTimeout;
-    uint8_t _maximumMessageSize;
     bool _messageTimeout;
     char _terminator;
     char _commandSeperator;
@@ -147,7 +162,7 @@ private:
      * @param message The message content.
      * @param identifier Optional identifier for the message.
      */
-    void sendMessage(String messageType, String message, String identifier);
+    void sendMessage(const char* messageType, const char* message, const char* identifier);
 
 public:
     /**
@@ -159,10 +174,14 @@ public:
      * @param commandSeperator Character that separates command from parameters.
      * @param paramSeperator Character that separates parameters.
      * @param timeoutMilliseconds Timeout for receiving a complete message.
-     * @param maximumMessageSize Maximum allowed message size.
+     * @param maxCommandLength Maximum length for command names (default 20).
+     * @param maxMessageLength Maximum total message length (default 128).
      */
-    SerialCommandManager(Stream* serialPort, MessageReceivedCallback commandReceived, char terminator, 
-        char commandSeperator, char paramSeperator, unsigned long timeoutMilliseconds, byte maximumMessageSize);
+    SerialCommandManager(Stream* serialPort, MessageReceivedCallback commandReceived, 
+        char terminator = '\n', char commandSeperator = ':', char paramSeperator = '=', 
+        unsigned long timeoutMilliseconds = 500, 
+        uint8_t maxCommandLength = DefaultMaxCommandLength,
+        uint8_t maxMessageLength = DefaultMaxMessageLength);
 
     /**
      * @brief Destructor for SerialCommandManager.
@@ -192,17 +211,17 @@ public:
     /**
      * @brief Gets the parsed command string from the last message.
      * 
-     * @return The command string.
+     * @return Pointer to the command string buffer.
      */
-    String getCommand();
+    const char* getCommand();
 
     /**
      * @brief Gets a parsed key/value argument by index.
      * 
      * @param index Index of the argument to retrieve.
-     * @return The key/value pair at the specified index.
+     * @return Pointer to the key/value pair at the specified index, or nullptr if invalid.
      */
-    StringKeyValue getArgs(uint8_t index);
+    const StringKeyValue* getArgs(uint8_t index);
 
     /**
      * @brief Gets the number of parsed arguments in the last message.
@@ -214,9 +233,9 @@ public:
     /**
      * @brief Gets the raw message string as received.
      * 
-     * @return The raw message string.
+     * @return Pointer to the raw message buffer.
      */
-    String getRawMessage();
+    const char* getRawMessage();
 
     /**
      * @brief Sends a command message over the serial port.
@@ -227,7 +246,7 @@ public:
      * @param params Optional array of key/value parameters.
      * @param argLength Number of parameters in the array.
      */
-    void sendCommand(String header, String message, String identifier = "", StringKeyValue* params = nullptr, uint8_t argLength = 0);
+    void sendCommand(const char* header, const char* message, const char* identifier = "", const StringKeyValue* params = nullptr, uint8_t argLength = 0);
 
     /**
      * @brief Sends a debug message over the serial port.
@@ -235,7 +254,23 @@ public:
      * @param message The debug message content.
      * @param identifier Optional identifier for the message.
      */
-    void sendDebug(String message, String identifier);
+    void sendDebug(const char* message, const char* identifier = "");
+
+    /**
+     * @brief Sends a debug message over the serial port using Flash string.
+     *
+     * @param message The debug message content stored in program memory.
+     * @param identifier Optional identifier for the message stored in program memory.
+     */
+    void sendDebug(const __FlashStringHelper* message, const __FlashStringHelper* identifier = nullptr);
+
+    /**
+     * @brief Sends a debug message over the serial port with Flash string identifier.
+     *
+     * @param message The debug message content.
+     * @param identifier Identifier for the message stored in program memory.
+     */
+    void sendDebug(const char* message, const __FlashStringHelper* identifier);
 
     /**
      * @brief Sends an error message over the serial port.
@@ -243,7 +278,23 @@ public:
      * @param message The error message content.
      * @param identifier Optional identifier for the message.
      */
-    void sendError(String message, String identifier);
+    void sendError(const char* message, const char* identifier = "");
+
+    /**
+     * @brief Sends an error message over the serial port using Flash string.
+     *
+     * @param message The error message content stored in program memory.
+     * @param identifier Optional identifier for the message stored in program memory.
+     */
+    void sendError(const __FlashStringHelper* message, const __FlashStringHelper* identifier = nullptr);
+
+    /**
+     * @brief Sends an error message over the serial port with Flash string identifier.
+     *
+     * @param message The error message content.
+     * @param identifier Identifier for the message stored in program memory.
+     */
+    void sendError(const char* message, const __FlashStringHelper* identifier);
 };
 
 #endif
