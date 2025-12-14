@@ -135,15 +135,15 @@ static DebugHandler s_debugHandler;
 // serial command handler;
 
 SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCallback commandReceived, 
-    char terminator, char commandSeperator, char paramSeperator, char keyValueSeperator, unsigned long timeoutMilliseconds,
+    char terminator, char commandSeparator, char paramSeparator, char keyValueSeparator, unsigned long timeoutMilliseconds,
     uint8_t maxCommandLength, uint8_t maxMessageLength)
 {
     _serialPort = serialPort;
     _messageReceivedCallback = commandReceived;
     _terminator = terminator;
-    _commandSeperator = commandSeperator;
-    _paramSeperator = paramSeperator;
-    _keyValueSeperator = keyValueSeperator;
+    _commandSeparator = commandSeparator;
+    _paramSeparator = paramSeparator;
+    _keyValueSeparator = keyValueSeparator;
     _serialTimeout = timeoutMilliseconds;
     _maxCommandLength = maxCommandLength;
     _maxMessageLength = maxMessageLength;
@@ -276,7 +276,7 @@ void SerialCommandManager::readCommands()
             }
             
             // Find command separator
-            int16_t sepChar = findChar(_incomingMessage, _commandSeperator);
+            int16_t sepChar = findChar(_incomingMessage, _commandSeparator);
             
             if (sepChar > -1)
             {
@@ -297,7 +297,7 @@ void SerialCommandManager::readCommands()
 
             break;
         }
-        else if (inChar == _commandSeperator)
+        else if (inChar == _commandSeparator)
         {
             if (_isParsingCommand)
             {
@@ -327,7 +327,7 @@ void SerialCommandManager::readCommands()
                 _isParsingParamName = true;
             }
         }
-        else if (inChar == _paramSeperator)  // Add semicolon as parameter separator
+        else if (inChar == _paramSeparator)  // Add semicolon as parameter separator
         {
             // Trim previous parameter before starting new one
             if (_paramCount > 0)
@@ -345,7 +345,7 @@ void SerialCommandManager::readCommands()
                 _isParsingParamName = true;
             }
         }
-        else if (inChar == _keyValueSeperator)
+        else if (inChar == _keyValueSeparator)
         {
             _isParsingParamName = false;
         }
@@ -433,7 +433,7 @@ void SerialCommandManager::sendCommand(const char* header, const char* message, 
     // Only print separator if we have message content or parameters
     if (msg[0] != '\0' || argLength > 0)
     {
-        _serialPort->print(_commandSeperator);
+        _serialPort->print(_commandSeparator);
     }
 
     if (msg[0] != '\0')
@@ -441,7 +441,7 @@ void SerialCommandManager::sendCommand(const char* header, const char* message, 
         _serialPort->print(msg);
 
         if (argLength > 0)
-            _serialPort->print(_commandSeperator);
+            _serialPort->print(_commandSeparator);
     }
 
     for (uint8_t i = 0; i < argLength; ++i)
@@ -450,11 +450,11 @@ void SerialCommandManager::sendCommand(const char* header, const char* message, 
             break;
 
         _serialPort->print(params[i].key);
-        _serialPort->print(_keyValueSeperator);
+        _serialPort->print(_keyValueSeparator);
         _serialPort->print(params[i].value);
 
         if (i != argLength - 1)
-            _serialPort->print(_paramSeperator);
+            _serialPort->print(_paramSeparator);
     }
 
     if (identifier && identifier[0] != '\0')

@@ -143,9 +143,9 @@ private:
     unsigned long _serialTimeout;
     bool _messageTimeout;
     char _terminator;
-    char _commandSeperator;
-    char _paramSeperator;
-	char _keyValueSeperator;
+    char _commandSeparator;
+    char _paramSeparator;
+	char _keyValueSeparator;
     bool _isDebug;
     MessageReceivedCallback _messageReceivedCallback;
 
@@ -172,16 +172,16 @@ public:
      * @param serialPort Pointer to the Stream object for serial communication.
      * @param commandReceived Callback function for received commands.
      * @param terminator Character that terminates a command message.
-     * @param commandSeperator Character that separates command from parameters.
-     * @param paramSeperator Character that separates parameters.
-	 * @param keyValueSeperator Character that separates keys from values in parameters.
+     * @param commandSeparator Character that separates command from parameters.
+     * @param paramSeparator Character that separates parameters.
+	 * @param keyValueSeparator Character that separates keys from values in parameters.
      * @param timeoutMilliseconds Timeout for receiving a complete message.
      * @param maxCommandLength Maximum length for command names (default 20).
      * @param maxMessageLength Maximum total message length (default 128).
      */
     SerialCommandManager(Stream* serialPort, MessageReceivedCallback commandReceived, 
-        char terminator = '\n', char commandSeperator = ':', char paramSeperator = ';', 
-		char keyValueSeperator = '=',
+        char terminator = '\n', char commandSeparator = ':', char paramSeparator = ';', 
+		char keyValueSeparator = '=',
         unsigned long timeoutMilliseconds = 500, 
         uint8_t maxCommandLength = DefaultMaxCommandLength,
         uint8_t maxMessageLength = DefaultMaxMessageLength);
