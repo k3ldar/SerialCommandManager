@@ -72,7 +72,7 @@ protected:
      * @param value The value as an int value (will be converted to string).
      * @return StringKeyValue with key copied and value converted to string.
      */
-    StringKeyValue makeParam(const char* key, int value);
+    static StringKeyValue makeParam(const char* key, int value);
 
     /**
      * @brief Create a StringKeyValue from a string key and a uint8_t value.
