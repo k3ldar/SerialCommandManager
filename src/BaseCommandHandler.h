@@ -75,21 +75,21 @@ protected:
     StringKeyValue makeParam(const char* key, int value);
 
     /**
-     * @brief Create a StringKeyValue from a string key and an int value.
+     * @brief Create a StringKeyValue from a string key and a uint8_t value.
      *
      * @param key The key as a null-terminated string.
-     * @param value The value as an int value (will be converted to string).
+     * @param value The value as a uint8_t value (will be converted to string).
      * @return StringKeyValue with key copied and value converted to string.
      */
     static StringKeyValue makeParam(const char* key, uint8_t value);
 
     /**
-     * @brief Create a StringKeyValue from a string key and a non-const char* value.
+     * @brief Create a StringKeyValue from a string key and a uint8_t value.
      *
      * @param key The key as a null-terminated string.
-     * @param value The value as a non-const char pointer (will be copied as a string).
-     * @return StringKeyValue with key copied and value copied as a string.
+     * @param value The value as a uint8_t value (will be converted to string).
+     * @return StringKeyValue with key copied and value converted to string.
      */
-    static StringKeyValue makeParam(const char* key, const char* value);
+    static StringKeyValue makeParam(const char* key, char* value);
 
 };

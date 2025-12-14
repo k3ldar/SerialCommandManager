@@ -9,8 +9,8 @@
      */
     static void safeCopy(char* dest, const char* src, size_t maxLen) {
         if (!dest || !src || maxLen == 0) return;
-        strncpy(dest, src, maxLen - 1);
-        dest[maxLen - 1] = '\0'; // Ensure null termination
+        strncpy(dest, src, maxLen);
+        dest[maxLen] = '\0'; // Ensure null termination
     }
 
     /**
@@ -82,6 +82,14 @@
         return len > 0 && str[len - 1] == c;
     }
 
+    /**
+     * @brief Trims the current parameter's key and value.
+     */
+    static void trimParameter(StringKeyValue& param) {
+        trimInPlace(param.key);
+        trimInPlace(param.value);
+    }
+
 
 //example to get memory
 // MEM;
@@ -127,7 +135,7 @@ static DebugHandler s_debugHandler;
 // serial command handler;
 
 SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCallback commandReceived, 
-    char terminator, char commandSeperator, char paramSeperator, unsigned long timeoutMilliseconds, 
+    char terminator, char commandSeperator, char paramSeperator, char keyValueSeperator, unsigned long timeoutMilliseconds,
     uint8_t maxCommandLength, uint8_t maxMessageLength)
 {
     _serialPort = serialPort;
@@ -135,6 +143,7 @@ SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCa
     _terminator = terminator;
     _commandSeperator = commandSeperator;
     _paramSeperator = paramSeperator;
+	_keyValueSeperator = keyValueSeperator;
     _serialTimeout = timeoutMilliseconds;
     _maxCommandLength = maxCommandLength;
     _maxMessageLength = maxMessageLength;
@@ -153,7 +162,7 @@ SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCa
     _command[0] = '\0';
     
     // Initialize parameter buffers
-    for (uint8_t i = 0; i < MaximumParameterCount; ++i)
+    for ( uint8_t i = 0; i < MaximumParameterCount; ++i )
     {
         _params[i].key[0] = '\0';
         _params[i].value[0] = '\0';
@@ -222,12 +231,14 @@ const char* SerialCommandManager::getRawMessage()
 {
     return _rawMessage;
 }
+
 void SerialCommandManager::readCommands()
 {
     // Check if any characters have arrived
     while (_serialPort->available() > 0)
     {
         char inChar = (char)_serialPort->read();
+
         _lastCharTime = millis();
 
         if (!_readingMessage)
@@ -235,6 +246,7 @@ void SerialCommandManager::readCommands()
             _readingMessage = true;
             _messageTimeout = false;
             _isParsingCommand = true;
+			_isParsingParamName = true;
             _rawMessage[0] = '\0';           // Clear raw message
             _incomingMessage[0] = '\0';      // Clear incoming message
             _paramCount = 0;
@@ -287,16 +299,53 @@ void SerialCommandManager::readCommands()
         }
         else if (inChar == _commandSeperator)
         {
-            if (_paramCount < MaximumParameterCount)
+            if (_isParsingCommand)
             {
-                _paramCount++;
-                _params[_paramCount - 1].key[0] = '\0';
-                _params[_paramCount - 1].value[0] = '\0';
+                // First separator after command - transition to parameter parsing
+                _isParsingCommand = false;
+                _isParsingParamName = true;
+                if (_paramCount < MaximumParameterCount)
+                {
+                    _paramCount++;
+                    _params[_paramCount - 1].key[0] = '\0';
+                    _params[_paramCount - 1].value[0] = '\0';
+                }
             }
-            _isParsingCommand = false;
-            _isParsingParamName = true;
+            else
+            {
+                // Trim previous parameter before starting new one
+                if (_paramCount > 0)
+                    trimParameter(_params[_paramCount - 1]);
+
+                // Subsequent separators - start new parameter
+                if (_paramCount < MaximumParameterCount)
+                {
+                    _paramCount++;
+                    _params[_paramCount - 1].key[0] = '\0';
+                    _params[_paramCount - 1].value[0] = '\0';
+                }
+                _isParsingParamName = true;
+            }
         }
-        else if (inChar == _paramSeperator)
+        else if (inChar == _paramSeperator)  // Add semicolon as parameter separator
+        {
+            // Trim previous parameter before starting new one
+            if (_paramCount > 0)
+                trimParameter(_params[_paramCount - 1]);
+
+            // Semicolon acts as parameter separator (only when not parsing command)
+            if (!_isParsingCommand)
+            {
+                if (_paramCount < MaximumParameterCount)
+                {
+                    _paramCount++;
+                    _params[_paramCount - 1].key[0] = '\0';
+                    _params[_paramCount - 1].value[0] = '\0';
+                }
+                _isParsingParamName = true;
+            }
+        }
+        else if (inChar == _keyValueSeperator)
         {
             _isParsingParamName = false;
         }
@@ -401,11 +450,11 @@ void SerialCommandManager::sendCommand(const char* header, const char* message, 
             break;
 
         _serialPort->print(params[i].key);
-        _serialPort->print(_paramSeperator);
+        _serialPort->print(_keyValueSeperator);
         _serialPort->print(params[i].value);
 
         if (i != argLength - 1)
-            _serialPort->print(_commandSeperator);
+            _serialPort->print(_paramSeperator);
     }
 
     if (identifier && identifier[0] != '\0')
@@ -527,12 +576,9 @@ void SerialCommandManager::sendDebug(const char* message, const __FlashStringHel
     // Convert Flash string identifier to temporary C-string
     char identifierBuffer[DefaultMaxParamKeyLength + 1];
 
-    // Copy Flash string to RAM buffer, handle optional identifier
-    if (identifier != nullptr) {
-        strncpy_P(identifierBuffer, (const char*)identifier, DefaultMaxParamKeyLength);
-        identifierBuffer[DefaultMaxParamKeyLength] = '\0';
-        sendDebug(message, identifierBuffer);
-    } else {
-        sendDebug(message, "");
-    }
+    // Copy Flash string to RAM buffer
+    strncpy_P(identifierBuffer, (const char*)identifier, DefaultMaxParamKeyLength);
+    identifierBuffer[DefaultMaxParamKeyLength] = '\0';
+
+    sendDebug(message, identifierBuffer);
 }
