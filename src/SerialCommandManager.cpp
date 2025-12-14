@@ -246,7 +246,7 @@ void SerialCommandManager::readCommands()
             _readingMessage = true;
             _messageTimeout = false;
             _isParsingCommand = true;
-			_isParsingParamName = true;
+            _isParsingParamName = true;
             _rawMessage[0] = '\0';           // Clear raw message
             _incomingMessage[0] = '\0';      // Clear incoming message
             _paramCount = 0;
