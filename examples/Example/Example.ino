@@ -28,7 +28,8 @@ public:
 
         for (int i = 0; i < paramCount; ++i) {
             if (strcmp(params[i].key, "direction") == 0) {
-                strcpy(direction, params[i].value);
+                strncpy(direction, params[i].value, sizeof(direction) - 1);
+                direction[sizeof(direction) - 1] = '\0';
             } else if (strcmp(params[i].key, "speed") == 0) {
                 speed = atoi(params[i].value);
             }
