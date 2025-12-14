@@ -143,7 +143,7 @@ SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCa
     _terminator = terminator;
     _commandSeparator = commandSeparator;
     _paramSeparator = paramSeparator;
-    _keyValueSeparator = keyValueSaparator;
+    _keyValueSeparator = keyValueSeparator;
     _serialTimeout = timeoutMilliseconds;
     _maxCommandLength = maxCommandLength;
     _maxMessageLength = maxMessageLength;
