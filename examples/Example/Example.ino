@@ -7,10 +7,9 @@
 #include "SerialCommandManager.h"
 
 // example commands would be
-// MOVE:direction=REVERSE;speed=180;
+// MOVE:direction=REVERSE;speed=180
 class MotorHandler : public ISerialCommandHandler {
 private:
-    const String _supportedCommands[1] = {"MOVE"};
     int _pinDirection;
     int _pinSpeed;
 
@@ -21,29 +20,35 @@ public:
         pinMode(_pinSpeed, OUTPUT);
     }
 
-    void handleCommand(SerialCommandManager* sender, const String command, const StringKeyValue params[], int paramCount) override {
+    bool handleCommand(SerialCommandManager* sender, const char* command, const StringKeyValue params[], uint8_t paramCount) override {
         Serial.println(sender->getRawMessage());
         (void)command;
-        String direction = "FORWARD";
+        char direction[10] = "FORWARD";
         int speed = 0;
 
         for (int i = 0; i < paramCount; ++i) {
-            if (params[i].key == "direction") {
-                direction = params[i].value;
-            } else if (params[i].key == "speed") {
-                speed = params[i].value.toInt();
+            if (strcmp(params[i].key, "direction") == 0) {
+                strncpy(direction, params[i].value, sizeof(direction) - 1);
+                direction[sizeof(direction) - 1] = '\0';
+            } else if (strcmp(params[i].key, "speed") == 0) {
+                speed = atoi(params[i].value);
             }
         }
 
-        digitalWrite(_pinDirection, direction == "FORWARD" ? HIGH : LOW);
+        PinStatus pinStatus = strcmp(direction, "FORWARD") == 0 ? HIGH : LOW;
+        digitalWrite(_pinDirection, pinStatus);
         analogWrite(_pinSpeed, constrain(speed, 0, 255));
 
-        sender->sendDebug("Motor moved " + direction + " at speed " + String(speed), "MotorHandler");
+        char debugMsg[DefaultMaxMessageLength];
+        snprintf_P(debugMsg, sizeof(debugMsg), "Motor moved %s at speed %d", direction, speed);
+        sender->sendDebug(debugMsg, "MotorHandler");
+        return true;
     }
 
-    const String* supportedCommands(size_t& count) const override {
-        count = 1;
-        return _supportedCommands;
+    const char* const* supportedCommands(size_t& count) const override {
+        static const char* cmds[] = { "MOVE" };
+        count = sizeof(cmds) / sizeof(cmds[0]);
+        return cmds;
     }
 };
 
@@ -55,6 +60,8 @@ void handleUnknown(SerialCommandManager* mgr)
     Serial.println(mgr->getCommand());
     Serial.print("Raw message: ");
     Serial.println(mgr->getRawMessage());
+    Serial.print("Param Count: ");
+    Serial.println(mgr->getArgCount());
 }
 
 // ------------------------------
@@ -62,7 +69,7 @@ void handleUnknown(SerialCommandManager* mgr)
 // ------------------------------
 MotorHandler motorHandler(5, 6); // Direction on pin 5, speed on pin 6
 
-SerialCommandManager commandManager(&Serial, nullptr, '\n', ':', ';', 1000, 64);
+SerialCommandManager commandManager(&Serial, handleUnknown, '\n', ':', ';', '=', 300, 64, 128);
 
 // ------------------------------
 // Setup
@@ -97,6 +104,6 @@ void loop()
     if (millis() - lastTime > 5000)
     {
         lastTime = millis();
-        commandManager.sendDebug("Heartbeat alive", "Loop");
+        commandManager.sendDebug(F("Heartbeat alive"), F("Loop"));
     }
 }

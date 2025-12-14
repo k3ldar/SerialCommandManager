@@ -145,6 +145,7 @@ private:
     char _terminator;
     char _commandSeperator;
     char _paramSeperator;
+	char _keyValueSeperator;
     bool _isDebug;
     MessageReceivedCallback _messageReceivedCallback;
 
@@ -173,12 +174,14 @@ public:
      * @param terminator Character that terminates a command message.
      * @param commandSeperator Character that separates command from parameters.
      * @param paramSeperator Character that separates parameters.
+	 * @param keyValueSeperator Character that separates keys from values in parameters.
      * @param timeoutMilliseconds Timeout for receiving a complete message.
      * @param maxCommandLength Maximum length for command names (default 20).
      * @param maxMessageLength Maximum total message length (default 128).
      */
     SerialCommandManager(Stream* serialPort, MessageReceivedCallback commandReceived, 
-        char terminator = '\n', char commandSeperator = ':', char paramSeperator = '=', 
+        char terminator = '\n', char commandSeperator = ':', char paramSeperator = ';', 
+		char keyValueSeperator = '=',
         unsigned long timeoutMilliseconds = 500, 
         uint8_t maxCommandLength = DefaultMaxCommandLength,
         uint8_t maxMessageLength = DefaultMaxMessageLength);
