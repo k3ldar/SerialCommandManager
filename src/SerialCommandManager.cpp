@@ -576,9 +576,12 @@ void SerialCommandManager::sendDebug(const char* message, const __FlashStringHel
     // Convert Flash string identifier to temporary C-string
     char identifierBuffer[DefaultMaxParamKeyLength + 1];
 
-    // Copy Flash string to RAM buffer
-    strncpy_P(identifierBuffer, (const char*)identifier, DefaultMaxParamKeyLength);
-    identifierBuffer[DefaultMaxParamKeyLength] = '\0';
-
-    sendDebug(message, identifierBuffer);
+    // Handle optional identifier
+    if (identifier != nullptr) {
+        strncpy_P(identifierBuffer, (const char*)identifier, DefaultMaxParamKeyLength);
+        identifierBuffer[DefaultMaxParamKeyLength] = '\0';
+        sendDebug(message, identifierBuffer);
+    } else {
+        sendDebug(message, "");
+    }
 }
