@@ -1,5 +1,4 @@
-#ifndef __SerialCommandManager__
-#define __SerialCommandManager__
+#pragma once
 
 
 #include <stdlib.h>
@@ -123,7 +122,7 @@ class SerialCommandManager
 {
     friend class DebugHandler;
 private:
-    ISerialCommandHandler** _handlerObjects;
+    ISerialCommandHandler** _handlerObjects = nullptr;
     size_t _handlerCount = 0;
     bool _readingMessage = false;
     bool _isParsingCommand = true;
@@ -134,6 +133,7 @@ private:
     char* _incomingMessage;        // Dynamic buffer for incoming message
     char* _command;                // Dynamic buffer for parsed command
     char* _rawMessage;             // Dynamic buffer for raw message
+    char* _sendBuffer;             // Reusable send buffer (avoids repeated heap allocation)
     uint8_t _maxCommandLength;     // Max command buffer size
     uint8_t _maxMessageLength;     // Max message buffer size
     
@@ -298,6 +298,12 @@ public:
      * @param identifier Identifier for the message stored in program memory.
      */
     void sendError(const char* message, const __FlashStringHelper* identifier);
+
+    /**
+     * @brief Enables or disables debug mode programmatically.
+     *
+     * @param enabled true to enable debug output, false to disable.
+     */
+    void setDebug(bool enabled);
 };
 
-#endif

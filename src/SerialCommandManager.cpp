@@ -7,7 +7,8 @@
     /**
      * @brief Safely copies a string into a buffer with length limit.
      */
-    static void safeCopy(char* dest, const char* src, size_t maxLen) {
+    static void safeCopy(char* dest, const char* src, size_t maxLen)
+    {
         if (!dest || !src || maxLen == 0) return;
         strncpy(dest, src, maxLen);
         dest[maxLen] = '\0'; // Ensure null termination
@@ -17,7 +18,8 @@
      * @brief Appends a character to a buffer if there's room.
      * @return true if character was added, false if buffer full.
      */
-    static bool appendChar(char* buffer, char c, size_t currentLen, size_t maxLen) {
+    static bool appendChar(char* buffer, char c, size_t currentLen, size_t maxLen)
+    {
         if (!buffer || currentLen >= maxLen) return false;
         buffer[currentLen] = c;
         buffer[currentLen + 1] = '\0';
@@ -29,18 +31,24 @@
      */
     static void trimInPlace(char* str) {
         if (!str) return;
-        
+
         // Trim leading whitespace
         char* start = str;
-        while (*start && (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n')) {
+        while (*start && (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n'))
+        {
             start++;
         }
-        
-        // Trim trailing whitespace
-        char* end = start + strlen(start) - 1;
-        while (end > start && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')) {
-            *end = '\0';
-            end--;
+
+        size_t trimmedLen = strlen(start);
+
+        if (trimmedLen > 0)
+        {
+            char* end = start + trimmedLen - 1;
+            while (end > start && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n'))
+            {
+                *end = '\0';
+                end--;
+            }
         }
         
         // Move trimmed string to beginning if needed
@@ -56,7 +64,8 @@
         if (!str) return;
         
         size_t len = strlen(str);
-        while (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r')) {
+        while (len > 0 && (str[len - 1] == '\n' || str[len - 1] == '\r'))
+        {
             str[len - 1] = '\0';
             len--;
         }
@@ -155,11 +164,13 @@ SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCa
     _incomingMessage = new char[_maxMessageLength + 1];
     _rawMessage = new char[_maxMessageLength + 1];
     _command = new char[_maxCommandLength + 1];
+    _sendBuffer = new char[_maxMessageLength + 1];
     
     // Initialize buffers to empty strings
     _incomingMessage[0] = '\0';
     _rawMessage[0] = '\0';
     _command[0] = '\0';
+    _sendBuffer[0] = '\0';
     
     // Initialize parameter buffers
     for ( uint8_t i = 0; i < MaximumParameterCount; ++i )
@@ -175,11 +186,12 @@ SerialCommandManager::SerialCommandManager(Stream* serialPort, MessageReceivedCa
 SerialCommandManager::~SerialCommandManager()
 {
     delete[] _handlerObjects;
-    
+
     // Clean up dynamically allocated buffers
     delete[] _incomingMessage;
     delete[] _rawMessage;
     delete[] _command;
+    delete[] _sendBuffer;
 }
 
 void SerialCommandManager::registerHandlers(ISerialCommandHandler** handlers, size_t handlerCount)
@@ -198,9 +210,11 @@ void SerialCommandManager::registerHandlers(ISerialCommandHandler** handlers, si
     // internal debug handler
     _handlerObjects[0] = &s_debugHandler;
 
-    for (size_t i = 1; i < _handlerCount; i++)
-    {
-        _handlerObjects[i] = handlers[i - internalHandlers];
+    if (handlers != nullptr) {
+        for (size_t i = 1; i < _handlerCount; i++)
+        {
+            _handlerObjects[i] = handlers[i - internalHandlers];
+        }
     }
 }
 
@@ -267,9 +281,11 @@ void SerialCommandManager::readCommands()
 
             // Strip terminator and any trailing newline/CR
             trimInPlace(_incomingMessage);
+
             if (endsWith(_incomingMessage, _terminator))
             {
                 size_t len = strlen(_incomingMessage);
+
                 if (len > 0) {
                     _incomingMessage[len - 1] = '\0';
                 }
@@ -280,9 +296,9 @@ void SerialCommandManager::readCommands()
             
             if (sepChar > -1)
             {
-                // Extract command (substring before separator)
-                strncpy(_command, _incomingMessage, sepChar);
-                _command[sepChar] = '\0';
+                size_t copyLen = (sepChar < _maxCommandLength) ? (size_t)sepChar : (size_t)_maxCommandLength;
+                strncpy(_command, _incomingMessage, copyLen);
+                _command[copyLen] = '\0';
             }
             else
             {
@@ -304,6 +320,7 @@ void SerialCommandManager::readCommands()
                 // First separator after command - transition to parameter parsing
                 _isParsingCommand = false;
                 _isParsingParamName = true;
+
                 if (_paramCount < MaximumParameterCount)
                 {
                     _paramCount++;
@@ -386,13 +403,6 @@ void SerialCommandManager::readCommands()
             }
         }
 
-        // Check message length
-        if (strlen(_incomingMessage) > _maxMessageLength)
-        {
-            sendError("Too Long", "SerialCommandManager");
-            _readingMessage = false;
-            return;
-        }
     }
 
     if (_readingMessage && (millis() - _lastCharTime > _serialTimeout))
@@ -417,28 +427,27 @@ void SerialCommandManager::sendCommand(const char* header, const char* message, 
         argLength = 0;
 
     // Make a local copy of message to sanitize terminator/CRLF if necessary
-    char msg[_maxMessageLength + 1];
     if (message)
     {
-        safeCopy(msg, message, _maxMessageLength);
-        removeTrailingTerminators(msg);
+        safeCopy(_sendBuffer, message, _maxMessageLength);
+        removeTrailingTerminators(_sendBuffer);
     }
     else
     {
-        msg[0] = '\0';
+        _sendBuffer[0] = '\0';
     }
 
     _serialPort->print(header);
-    
+
     // Only print separator if we have message content or parameters
-    if (msg[0] != '\0' || argLength > 0)
+    if (_sendBuffer[0] != '\0' || argLength > 0)
     {
         _serialPort->print(_commandSeparator);
     }
 
-    if (msg[0] != '\0')
+    if (_sendBuffer[0] != '\0')
     {
-        _serialPort->print(msg);
+        _serialPort->print(_sendBuffer);
 
         if (argLength > 0)
             _serialPort->print(_commandSeparator);
@@ -465,7 +474,7 @@ void SerialCommandManager::sendCommand(const char* header, const char* message, 
     }
 
     // Only print the terminator if message doesn't already end with it
-    if (!endsWith(msg, _terminator))
+    if (!endsWith(_sendBuffer, _terminator))
         _serialPort->print(_terminator);
 }
 
@@ -491,7 +500,7 @@ bool SerialCommandManager::processMessage()
 
 void SerialCommandManager::sendMessage(const char* messageType, const char* message, const char* identifier)
 {
-    if (!message || message[0] == '\0')
+    if (!messageType || !message || message[0] == '\0')
         return;
 
     if (strcmp(messageType, "DEBUG") == 0 && !_isDebug)
@@ -529,21 +538,19 @@ void SerialCommandManager::sendError(const char* message, const __FlashStringHel
 }
 
 void SerialCommandManager::sendError(const __FlashStringHelper* message, const __FlashStringHelper* identifier) {
-    // Convert Flash strings to temporary C-strings
-    char messageBuffer[_maxMessageLength];
+    // Copy Flash string to reusable send buffer
+    strncpy_P(_sendBuffer, (const char*)message, _maxMessageLength);
+    _sendBuffer[_maxMessageLength] = '\0';
+
     char identifierBuffer[DefaultMaxParamKeyLength + 1];
-    
-    // Copy Flash string to RAM buffer
-    strncpy_P(messageBuffer, (const char*)message, _maxMessageLength - 1);
-    messageBuffer[_maxMessageLength - 1] = '\0';
-    
+
     // Handle optional identifier
     if (identifier != nullptr) {
         strncpy_P(identifierBuffer, (const char*)identifier, DefaultMaxParamKeyLength);
         identifierBuffer[DefaultMaxParamKeyLength] = '\0';
-        sendError(messageBuffer, identifierBuffer);
+        sendError(_sendBuffer, identifierBuffer);
     } else {
-        sendError(messageBuffer, "");
+        sendError(_sendBuffer, "");
     }
 }
 
@@ -553,22 +560,20 @@ void SerialCommandManager::sendDebug(const char* message, const char* identifier
 }
 
 void SerialCommandManager::sendDebug(const __FlashStringHelper* message, const __FlashStringHelper* identifier) {
-    // Convert Flash strings to temporary C-strings
-    char messageBuffer[_maxMessageLength];
-    char identifierBuffer[DefaultMaxParamKeyLength + 1];
+    // Copy Flash string to reusable send buffer
+    strncpy_P(_sendBuffer, (const char*)message, _maxMessageLength);
+    _sendBuffer[_maxMessageLength] = '\0';
 
-    // Copy Flash string to RAM buffer
-    strncpy_P(messageBuffer, (const char*)message, _maxMessageLength - 1);
-    messageBuffer[_maxMessageLength - 1] = '\0';
+    char identifierBuffer[DefaultMaxParamKeyLength + 1];
 
     // Handle optional identifier
     if (identifier != nullptr) {
         strncpy_P(identifierBuffer, (const char*)identifier, DefaultMaxParamKeyLength);
         identifierBuffer[DefaultMaxParamKeyLength] = '\0';
-        sendDebug(messageBuffer, identifierBuffer);
+        sendDebug(_sendBuffer, identifierBuffer);
     }
     else {
-        sendDebug(messageBuffer, "");
+        sendDebug(_sendBuffer, "");
     }
 }
 
@@ -584,4 +589,9 @@ void SerialCommandManager::sendDebug(const char* message, const __FlashStringHel
     } else {
         sendDebug(message, "");
     }
+}
+
+void SerialCommandManager::setDebug(bool enabled)
+{
+    _isDebug = enabled;
 }
